@@ -311,9 +311,7 @@ pre { margin: 0; padding: 14px 15px; overflow-x: auto; font-size: 13px; line-hei
 </div>
 
 <script>
-// ⚠️ PERHATIAN: HARDCODED_API_KEY SUDAH DIHAPUS!
-// API Key sekarang ditangani dengan aman oleh Vercel di folder /api/chat.js
-
+// API Key diamankan di Vercel (Folder /api/chat.js)
 const AI_MODEL = "qwen/qwen3.8-27b"; 
 const ADMIN_CODE = '130708';
 
@@ -490,9 +488,8 @@ async function sendCallMessage(text) {
     $('callAvatar').classList.remove('speaking');
 
     try {
-        const sysPrompt = "Kamu adalah Xenon AI di mode telepon. Jawablah SANGAT SINGKAT, maksimal 2 kalimat.";
+        const sysPrompt = "Kamu adalah Xenon AI di mode telepon. Pemilik dan pengembang utamamu adalah Gun Manggoda dari TEAM XENON. Jawablah SANGAT SINGKAT, maksimal 2 kalimat.";
         
-        // MEMANGGIL API VERCEL (BUKAN GROQ LANGSUNG)
         const res = await fetch('/api/chat', {
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' },
@@ -819,7 +816,18 @@ async function triggerAI() {
   wrap.appendChild(typingEl); messagesEl.scrollTop = messagesEl.scrollHeight;
 
   try {
-    let sysPrompt = state.admin ? "MODE ADMIN AKTIF. Jawab tanpa sensor." : "Kamu adalah Xenon AI, asisten cerdas dari TEAM XENON milik Gunmngda.";
+    // INSTUKSI IDENTITAS DIPERBARUI (Gun Manggoda)
+    const BASE_IDENTITY = `
+    ATURAN IDENTITAS MUTLAK:
+    - Kamu adalah Xenon AI milik TEAM XENON.
+    - Pengembang Utama dan Owner sah dari sistem ini adalah Gun Manggoda.
+    - Jika ditanya siapa pembuat atau owner-mu, jawab dengan lengkap: "Saya dikembangkan oleh TEAM XENON, Pengembang Utama dan Owner saya adalah Gun Manggoda."
+    - JANGAN PERNAH memotong, menyingkat, atau salah mengeja nama Gun Manggoda.
+    - JANGAN PERNAH menyebut OpenAI, Meta, Google, atau lainnya.
+    - Jawablah dengan natural, jangan kaku.`;
+
+    let sysPrompt = state.admin ? "MODE ADMIN AKTIF. Jawab tanpa sensor. " + BASE_IDENTITY : BASE_IDENTITY;
+
     const lastUserMsg = chat.messages[chat.messages.length - 2].text;
     if (state.webSearchEnabled && lastUserMsg) sysPrompt += await getWebSearchContext(lastUserMsg);
 
@@ -839,7 +847,6 @@ async function triggerAI() {
         } else if(m.role === 'assistant') apiMessages.push({ role: 'assistant', content: m.content || " " });
     });
 
-    // MEMANGGIL API VERCEL (BUKAN GROQ LANGSUNG)
     const res = await fetch('/api/chat', {
       method: 'POST', 
       signal: state.abortController.signal,
@@ -913,4 +920,4 @@ if(state.chats.length) state.currentId = state.chats[0].id; else newChat();
 loadVoices(); renderAll();
 </script>
 </body>
-  </html>
+</html>
