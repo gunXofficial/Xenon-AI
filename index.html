@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Xenon AI - Ultimate Edition</title>
+
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#08080d">
+<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4712/4712035.png">
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+
+<style>
+:root {
+  --bg: #08080d; --panel: #101018; --panel2: #171722; --panel3: #1e1e2c;
+  --border: #26263a; --text: #e9e9f2; --muted: #8b8ba3;
+  --accent: #7c5cff; --accent2: #00d4ff; --danger: #ff4d6d; --ok: #2ecc71;
+}
+body.light-theme {
+  --bg: #cbd5e1; --panel: #e2e8f0; --panel2: #f8fafc; --panel3: #94a3b8;
+  --border: #94a3b8; --text: #0f172a; --muted: #475569;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--text); overflow: hidden;
+  font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+  transition: background 0.3s, color 0.3s;
+}
+
+#bg-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; opacity: 0.6; }
+#app { display: flex; height: 100dvh; width: 100%; position: relative; z-index: 1; }
+
+/* SIDEBAR */
+#sidebar { width: 280px; flex: 0 0 280px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; height: 100%; transition: transform .28s; z-index: 50; }
+#backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 40; backdrop-filter: blur(2px); }
+.brand { padding: 18px; font-weight: 800; font-size: 19px; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; color: transparent; }
+#newChat { margin: 0 14px 10px; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel2); color: var(--text); cursor: pointer; font-weight: 600; display: flex; justify-content: center; transition: 0.2s; }
+#newChat:hover { background: var(--panel3); }
+#searchChat { margin: 0 14px 14px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); outline: none; }
+#chatList { flex: 1; overflow-y: auto; padding: 0 10px; }
+.chat-item { display: flex; align-items: center; gap: 8px; padding: 11px; border-radius: 10px; cursor: pointer; font-size: 13.5px; color: var(--muted); margin-bottom: 3px; user-select: none; border: 1px solid transparent; transition: 0.2s; }
+.chat-item:hover { background: var(--panel2); }
+.chat-item.active { background: var(--panel3); border-color: var(--border); color: var(--text); }
+.chat-item .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-footer { border-top: 1px solid var(--border); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.side-btn { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel2); color: var(--text); cursor: pointer; font-size: 13px; text-align: left; transition: 0.2s; display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.side-btn:hover { background: var(--panel3); }
+
+/* MAIN & HEADER */
+main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; background: transparent; }
+header { height: 60px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--border); background: var(--panel); opacity: 0.95; backdrop-filter: blur(10px); z-index: 10; }
+.ai-profile-pic { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent); box-shadow: 0 0 10px rgba(124,92,255,.4); }
+#menuBtn { display: none; background: transparent; border: none; color: var(--text); font-size: 20px; cursor: pointer; padding-right: 5px; }
+.h-title { font-weight: 700; font-size: 15px; white-space: nowrap; }
+.h-sub { font-size: 11.5px; color: var(--muted); }
+.header-actions { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.icon-btn { background: transparent; border: none; color: var(--muted); font-size: 16px; cursor: pointer; padding: 6px; display: flex; align-items: center; justify-content: center; transition: 0.2s; border-radius: 6px; }
+.icon-btn:hover { color: var(--text); background: var(--panel2); }
+#ttsToggleBtn.muted { color: var(--danger); }
+#adminBadge { display: none; font-size: 10px; font-weight: 800; padding: 4px 8px; border-radius: 20px; color: #00e08a; border: 1px solid #00e08a; background: rgba(0,224,138,.1); margin-left: 4px; }
+#adminBadge.on { display: inline-block; animation: pulse 2s infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 15px rgba(0,224,138,.5); } }
+
+/* CHAT BUBBLE */
+#messages { flex: 1; overflow-y: auto; padding: 20px 0 10px; scroll-behavior: smooth; background: transparent; }
+.wrap { max-width: 820px; margin: 0 auto; padding: 0 18px; display: flex; flex-direction: column; }
+.msg { display: flex; gap: 10px; margin-bottom: 18px; max-width: 100%; animation: fade .25s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.msg.user { flex-direction: row-reverse; align-self: flex-end; }
+.msg.user .bubble { background: var(--panel3); border: 1px solid var(--border); border-radius: 16px 16px 4px 16px; cursor: pointer; transition: 0.2s; }
+.msg.user .bubble:active { opacity: 0.6; }
+.msg.ai { align-self: flex-start; }
+.msg.ai .bubble { background: var(--panel2); border: 1px solid var(--border); border-radius: 16px 16px 16px 4px; }
+.avatar { width: 30px; height: 30px; flex: 0 0 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; margin-top: 2px; }
+.msg.user .avatar { background: linear-gradient(135deg, #2b2b45, #3d3d60); color: #b9b9d8; }
+.msg.ai .avatar { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+.msg-ai-wrapper { display: flex; flex-direction: column; align-items: flex-start; width: fit-content; max-width: 85%; gap: 4px; }
+.bubble { width: fit-content; max-width: 100%; font-size: 14.6px; line-height: 1.65; padding: 10px 16px 6px 16px; position: relative; word-wrap: break-word; overflow-wrap: anywhere; transform: translateZ(0); will-change: contents; }
+.msg.user .bubble { max-width: 85%; }
+.bubble p { margin-bottom: 8px; }
+.bubble img { max-width: 200px; max-height: 200px; object-fit: cover; border-radius: 8px; margin-top: 8px; cursor: pointer; border: 1px solid var(--border); }
+.bubble-footer { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 4px; height: 16px; }
+.msg-time { font-size: 10.5px; color: var(--muted); opacity: 0.8; user-select: none; white-space: nowrap; }
+.action-btn { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 0; display: flex; align-items: center; gap: 3px; opacity: 0.7; transition: 0.2s; }
+.action-btn:hover { color: var(--accent); opacity: 1; }
+.regen-btn-outside { align-self: flex-end; background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 4px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+.regen-btn-outside:hover { color: var(--text); background: var(--panel2); }
+.regen-btn-outside svg { width: 16px; height: 16px; }
+
+/* LIVE PREVIEW KODE */
+.codeblock { margin: 10px 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); position: relative; background: #0d0d15; width: 100%; }
+.codehead { display: flex; justify-content: space-between; align-items: center; padding: 8px 13px; background: #14141f; border-bottom: 1px solid #2b2b40; font-size: 11.5px; color: var(--muted); text-transform: uppercase; font-weight: 700; }
+.codehead span { color: #8fe3ff; }
+.code-actions { display: flex; gap: 6px; }
+.previewBtn { background: rgba(0, 224, 138, 0.15); border: 1px solid rgba(0, 224, 138, 0.3); color: #00e08a; font-size: 11px; padding: 3px 10px; border-radius: 6px; cursor: pointer; text-transform: none; font-weight: 600; }
+.previewBtn:hover { background: #00e08a; color: #000; }
+.copyBtn { background: #1c1c2a; border: 1px solid #444; color: #fff; font-size: 11px; padding: 3px 10px; border-radius: 6px; cursor: pointer; text-transform: none; font-weight: 400; }
+.copyBtn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+pre { margin: 0; padding: 14px 15px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+
+/* INPUT BOX */
+#composerWrap { padding: 12px 0 18px; background: linear-gradient(to top, var(--bg) 55%, transparent); position: relative; z-index: 10; }
+#composer { max-width: 820px; margin: 0 auto; padding: 0 18px; }
+#attachmentPreview { display: none; background: var(--panel2); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; margin-bottom: 8px; align-items: center; justify-content: space-between; }
+#attachmentPreview .file-info { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text); overflow: hidden; }
+#attachmentPreview img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; }
+#attachmentPreview .close-attach { background: transparent; border: none; color: var(--danger); font-size: 18px; cursor: pointer; }
+.inputbox { display: flex; align-items: flex-end; gap: 4px; background: var(--panel2); border: 1px solid var(--border); border-radius: 16px; padding: 6px 10px; transition: 0.2s; }
+.inputbox:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,92,255,.13); }
+#input { flex: 1; background: transparent; border: none; outline: none; color: var(--text); resize: none; padding: 8px 0; max-height: 120px; font-family: inherit; font-size: 14.6px; }
+#webSearchBtn { background: transparent; border: none; font-size: 18px; cursor: pointer; padding: 5px; opacity: 0.5; transition: 0.2s; }
+#webSearchBtn.active { opacity: 1; filter: drop-shadow(0 0 5px var(--accent2)); }
+.ctrl-btn { background: transparent; border: none; color: var(--muted); font-size: 18px; cursor: pointer; padding: 6px 4px; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+.ctrl-btn:hover { color: var(--text); }
+#sendBtn { background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; width: 34px; height: 34px; border-radius: 10px; color: #fff; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: 0.2s; margin-left: 4px; }
+#sendBtn.stop-mode { background: var(--danger); }
+
+/* VOICE CALL OVERLAY */
+#voiceCallOverlay { position: fixed; inset: 0; z-index: 9999; background: rgba(8, 8, 13, 0.95); backdrop-filter: blur(15px); display: none; flex-direction: column; align-items: center; justify-content: center; color: #fff; }
+#voiceCallOverlay.show { display: flex; animation: fade 0.3s ease; }
+
+.call-avatar { 
+    width: 120px; height: 120px; border-radius: 50%; 
+    object-fit: cover; border: 3px solid var(--accent);
+    box-shadow: 0 0 20px rgba(124,92,255,0.5);
+    margin-bottom: 20px; position: relative; 
+}
+.call-avatar::after { content: ''; position: absolute; inset: -15px; border-radius: 50%; border: 2px solid var(--accent); opacity: 0; }
+.call-avatar.speaking::after { animation: ripple 1.5s infinite; }
+@keyframes ripple { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.5); opacity: 0; } }
+
+.call-status { font-size: 16px; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
+.call-transcript { font-size: 20px; font-weight: 600; text-align: center; max-width: 80%; margin-bottom: 40px; min-height: 60px; line-height: 1.4; }
+.call-controls { display: flex; gap: 20px; }
+.call-btn { width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 24px; transition: 0.2s; }
+.call-btn.mute { background: rgba(255,255,255,0.1); color: #fff; }
+.call-btn.end { background: var(--danger); color: #fff; box-shadow: 0 0 20px rgba(255,77,109,0.4); }
+.call-btn:hover { transform: scale(1.1); }
+
+/* MODALS */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); backdrop-filter: blur(5px); display: none; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
+.overlay.show { display: flex; animation: fade .18s; }
+.modal { background: var(--panel); padding: 22px; border-radius: 16px; width: 100%; max-width: 400px; border: 1px solid var(--border); box-shadow: 0 24px 70px rgba(0,0,0,.4); }
+.modal h3 { margin-bottom: 15px; font-size: 17px; }
+.modal input, .modal select, .modal textarea { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel2); color: var(--text); outline: none; font-family: inherit; font-size: 14px; resize: none; }
+.modal label { font-size: 12px; color: var(--muted); margin-bottom: 5px; display: block; }
+.btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; font-size: 14px; }
+
+#previewModal { 
+    z-index: 999999; padding: 0; background: #fff; position: fixed; 
+    top: 0; left: 0; width: 100vw; height: 100vh; display: none; 
+}
+#previewModal.show { display: flex; }
+#previewModal .preview-content { width: 100%; height: 100%; display: flex; flex-direction: column; }
+#previewModal .preview-header { background: var(--panel); padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+#previewModal iframe { flex: 1; width: 100%; border: none; background: #fff; }
+
+#toastContainer { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; width: 100%; max-width: 90vw; align-items: center; }
+.toast { background: var(--panel); color: var(--text); padding: 12px 18px; border-radius: 8px; font-size: 13px; border-left: 4px solid var(--accent); opacity: 0; transform: translateY(-20px); transition: 0.3s; box-shadow: 0 8px 24px rgba(0,0,0,.2); width: fit-content; max-width: 100%; text-align: center; word-wrap: break-word; }
+.toast.show { opacity: 1; transform: translateY(0); }
+
+@media(max-width:820px) {
+  #sidebar { position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-100%); }
+  #sidebar.open { transform: translateX(0); }
+  #sidebar.open + #backdrop { display: block; }
+  #menuBtn { display: block; }
+  .h-sub { display: none; }
+  .msg.user .bubble { max-width: 90%; }
+  .msg-ai-wrapper { max-width: 90%; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div id="toastContainer"></div>
+
+<div id="voiceCallOverlay">
+    <img src="https://cdn-icons-png.flaticon.com/512/4712/4712035.png" class="call-avatar" id="callAvatar">
+    <div class="call-status" id="callStatus">Menghubungkan...</div>
+    <div class="call-transcript" id="callTranscript">...</div>
+    <div class="call-controls">
+        <button class="call-btn mute" id="callMuteBtn" title="Mute Mic">🎤</button>
+        <button class="call-btn end" id="callEndBtn" title="Akhiri Panggilan">📞</button>
+    </div>
+</div>
+
+<div id="app">
+  <aside id="sidebar">
+    <div class="brand">Xenon AI</div>
+    <button id="newChat">＋ Obrolan Baru</button>
+    <input type="text" id="searchChat" placeholder="Cari obrolan...">
+    <div id="chatList"></div>
+    <div class="sidebar-footer">
+      <button class="side-btn" id="themeToggleBtn">☀️ Mode Terang</button>
+      <button class="side-btn" id="voiceSettingsBtn">⚙️ Pengaturan Suara AI</button>
+    </div>
+  </aside>
+  <div id="backdrop"></div>
+
+  <main>
+    <header>
+      <button id="menuBtn">☰</button>
+      <img src="https://cdn-icons-png.flaticon.com/512/4712/4712035.png" class="ai-profile-pic" alt="Xenon Profile">
+      <div style="display:flex; flex-direction:column;">
+        <span class="h-title">Xenon AI</span>
+        <span class="h-sub" id="headerSub">Asisten cerdas</span>
+      </div>
+      
+      <div class="header-actions">
+        <button id="ttsToggleBtn" class="icon-btn" title="Suara AI (Mute/Unmute)">🔊</button>
+        <button id="callBtn" class="icon-btn" title="Panggilan Suara AI">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+            </svg>
+        </button>
+        <span id="adminBadge">ADMIN</span>
+      </div>
+    </header>
+
+    <div id="messages"></div>
+
+    <div id="composerWrap">
+      <div id="composer">
+        <div id="attachmentPreview">
+          <div class="file-info" id="fileInfoText">
+            <span id="fileIcon">📄</span>
+            <span id="fileName">dokumen.txt</span>
+          </div>
+          <button class="close-attach" onclick="clearAttachment()">×</button>
+        </div>
+        
+        <div class="inputbox">
+          <input type="file" id="fileInput" accept="image/*, .pdf, .txt, .html, .css, .js, .json" style="display:none;">
+          <button id="webSearchBtn" class="ctrl-btn" title="Cari di Internet">🌐</button>
+          <button class="ctrl-btn" id="attachBtn" title="Lampirkan File/Foto">+</button>
+          
+          <textarea id="input" rows="1" placeholder="Kirim pesan..."></textarea>
+          
+          <button class="ctrl-btn" id="micBtn" title="Bicara (Auto-Send)">🎤</button>
+          <button id="sendBtn" title="Kirim">➤</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="overlay" id="previewModal">
+    <div class="preview-content">
+        <div class="preview-header">
+            <span style="font-weight:bold; color:var(--text);">👁️ Live Preview</span>
+            <button class="btn" style="width:auto; padding:5px 15px; background:var(--danger);" onclick="document.getElementById('previewModal').classList.remove('show')">Tutup</button>
+        </div>
+        <iframe id="previewIframe" sandbox="allow-scripts allow-modals"></iframe>
+    </div>
+</div>
+
+<div class="overlay" id="voiceModal">
+  <div class="modal">
+    <h3>🎙️ Pengaturan Suara AI</h3>
+    <label>Pilih Karakter Suara</label>
+    <select id="voiceSelect"></select>
+    
+    <button class="btn" id="btnFemale" style="background:var(--panel3); color:var(--text); margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 5px;">
+        👩 Gunakan Suara Wanita
+    </button>
+
+    <label>Kecepatan Bicara (Rate)</label>
+    <input type="range" id="voiceRate" min="0.5" max="1.5" step="0.1" value="1">
+    <label>Nada Suara (Pitch)</label>
+    <input type="range" id="voicePitch" min="0.5" max="1.5" step="0.1" value="1">
+    <div style="display:flex;gap:10px; margin-top:15px;">
+      <button class="btn" id="testVoiceBtn" style="background:var(--panel3); color:var(--text);">Tes Suara</button>
+      <button class="btn" id="voiceClose">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="adminModal">
+  <div class="modal">
+    <h3>🔐 Verifikasi Admin</h3>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:10px;">Masukkan PIN 6 digit.</p>
+    <input type="password" id="codeInput" maxlength="6" placeholder="••••••" style="text-align:center;font-size:24px;letter-spacing:10px;font-weight:800;">
+    <button class="btn" id="codeSubmit">Buka</button>
+  </div>
+</div>
+
+<div class="overlay" id="editMsgModal">
+  <div class="modal">
+    <h3>✏️ Edit Pesan</h3>
+    <textarea id="editMsgInput" rows="3"></textarea>
+    <div style="display:flex;gap:10px;">
+      <button class="btn" id="editMsgCancel" style="background:var(--panel3);color:var(--text);">Batal</button>
+      <button class="btn" id="editMsgSave">Simpan & Kirim</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="chatActionModal">
+  <div class="modal">
+    <h3 style="text-align:center;" id="chatActionTitle">Pilih Aksi</h3>
+    <button class="btn" id="actionEditTitle" style="margin-bottom:10px;background:var(--panel3);color:var(--text);">✏️ Edit Nama</button>
+    <button class="btn" style="background:var(--danger); margin-bottom:10px;" id="actionDeleteChat">🗑️ Hapus Obrolan</button>
+    <button class="btn" id="actionCancel" style="background:transparent;border:none;color:var(--muted);">Batal</button>
+  </div>
+</div>
+
+<script>
+// ⚠️ PERHATIAN: HARDCODED_API_KEY SUDAH DIHAPUS!
+// API Key sekarang ditangani dengan aman oleh Vercel di folder /api/chat.js
+
+const AI_MODEL = "qwen/qwen3.8-27b"; 
+const ADMIN_CODE = '130708';
+
+let parsedChats = [];
+let parsedVoice = {};
+try { parsedChats = JSON.parse(localStorage.getItem('xenon_chats_v1')) || []; } catch(e) { parsedChats = []; }
+try { parsedVoice = JSON.parse(localStorage.getItem('xenon_voice_settings')) || {}; } catch(e) { parsedVoice = {}; }
+
+const state = {
+  chats: parsedChats, currentId: null, admin: false, busy: false, abortController: null,
+  recognition: null, editingMsgIndex: -1, actionChatId: null, ttsMuted: false, pendingAttachment: null,
+  voiceSettings: { voiceURI: '', rate: 1, pitch: 1, ...parsedVoice },
+  webSearchEnabled: false, 
+  isVoiceCallActive: false, 
+  isCallMuted: false,
+  isAIThinking: false,
+  isAISpeaking: false
+};
+
+const $ = id => document.getElementById(id);
+const messagesEl = $('messages'), inputEl = $('input'), sendBtn = $('sendBtn');
+const chatListEl = $('chatList'), sidebar = $('sidebar'), backdrop = $('backdrop');
+
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let width, height, particles = [], particleColor = 'rgba(255,255,255,0.7)', lineColorBase = '255,255,255';
+
+function resizeCanvas() { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; }
+window.addEventListener('resize', resizeCanvas); resizeCanvas();
+
+class Particle {
+    constructor() { this.x = Math.random()*width; this.y = Math.random()*height; this.vx = (Math.random()-0.5)*0.6; this.vy = (Math.random()-0.5)*0.6; this.r = Math.random()*1.5+1; }
+    update() { this.x += this.vx; this.y += this.vy; if (this.x<0||this.x>width) this.vx*=-1; if (this.y<0||this.y>height) this.vy*=-1; }
+    draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI*2); ctx.fillStyle = particleColor; ctx.fill(); }
+}
+const particleCount = Math.min(window.innerWidth / 6, 150);
+for (let i = 0; i < particleCount; i++) particles.push(new Particle());
+
+function animateCanvas() {
+    ctx.clearRect(0, 0, width, height);
+    particles.forEach(p => { p.update(); p.draw(); });
+    for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+            const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < 120) {
+                ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y); ctx.lineTo(particles[j].x, particles[j].y);
+                ctx.strokeStyle = `rgba(${lineColorBase}, ${1 - dist/120})`; ctx.lineWidth = 0.8; ctx.stroke();
+            }
+        }
+    }
+    requestAnimationFrame(animateCanvas);
+}
+animateCanvas();
+
+function showToast(msg, type = 'info') {
+  const t = document.createElement('div'); t.className = `toast ${type}`; t.textContent = msg;
+  $('toastContainer').appendChild(t);
+  setTimeout(() => t.classList.add('show'), 10);
+  setTimeout(() => { t.classList.remove('show'); setTimeout(()=>t.remove(), 300); }, 4000);
+}
+function save() { try { localStorage.setItem('xenon_chats_v1', JSON.stringify(state.chats)); } catch(e) {} }
+function getCurrent() { return state.chats.find(c => c.id === state.currentId); }
+function formatTime(ts) { if (!ts) return ''; const d = new Date(ts); return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; }
+
+function applyTheme(theme) {
+    if(theme === 'light') { document.body.classList.add('light-theme'); $('themeToggleBtn').innerHTML = '🌙 Mode Gelap'; particleColor = 'rgba(71, 85, 105, 0.4)'; lineColorBase = '71, 85, 105'; }
+    else { document.body.classList.remove('light-theme'); $('themeToggleBtn').innerHTML = '☀️ Mode Terang'; particleColor = 'rgba(255, 255, 255, 0.7)'; lineColorBase = '255, 255, 255'; }
+    localStorage.setItem('xenon_theme', theme);
+}
+applyTheme(localStorage.getItem('xenon_theme') || 'dark');
+$('themeToggleBtn').onclick = () => { const nt = document.body.classList.contains('light-theme') ? 'dark' : 'light'; applyTheme(nt); closeSidebar(); };
+
+$('webSearchBtn').onclick = () => {
+    state.webSearchEnabled = !state.webSearchEnabled;
+    $('webSearchBtn').classList.toggle('active', state.webSearchEnabled);
+    showToast(state.webSearchEnabled ? "🌐 Pencarian Internet Aktif" : "🌐 Pencarian Internet Nonaktif");
+};
+
+async function getWebSearchContext(query) {
+    if(!state.webSearchEnabled) return "";
+    showToast("Mencari di internet...", "info");
+    try {
+        const res = await fetch(`https://id.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`);
+        const data = await res.json();
+        if(data.query && data.query.search && data.query.search.length > 0) {
+            let snippets = data.query.search.slice(0, 3).map(s => `- ${s.title}: ${s.snippet.replace(/<[^>]+>/g, '')}`).join('\n');
+            return `\n\n[DATA INTERNET]:\n${snippets}\n(Gunakan data ini untuk menjawab).`;
+        }
+    } catch(e) { console.log("Web search failed", e); }
+    return "";
+}
+
+/* =========================================================
+   FITUR VOICE CALL
+   ========================================================= */
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let callRecognition = null;
+
+if(SpeechRecognition) {
+    callRecognition = new SpeechRecognition();
+    callRecognition.lang = 'id-ID';
+    callRecognition.continuous = false;
+    
+    callRecognition.onresult = (e) => {
+        if(state.isCallMuted || state.isAIThinking || state.isAISpeaking) return;
+        const text = e.results[0][0].transcript;
+        if(!text.trim()) return;
+        $('callTranscript').textContent = `"${text}"`;
+        sendCallMessage(text);
+    };
+    
+    callRecognition.onend = () => {
+        if(state.isVoiceCallActive && !state.isCallMuted && !state.isAIThinking && !state.isAISpeaking) {
+            try { callRecognition.start(); } catch(e){}
+        }
+    };
+}
+
+$('callBtn').onclick = () => {
+    state.isVoiceCallActive = true; 
+    state.isCallMuted = false;
+    state.isAIThinking = false;
+    state.isAISpeaking = false;
+    
+    $('voiceCallOverlay').classList.add('show');
+    $('callTranscript').textContent = "...";
+    $('callStatus').textContent = "Mendengarkan...";
+    $('callAvatar').classList.remove('speaking');
+    
+    if(callRecognition) {
+        try { callRecognition.start(); } catch(e){}
+    }
+};
+
+$('callEndBtn').onclick = () => {
+    state.isVoiceCallActive = false;
+    state.isAIThinking = false;
+    state.isAISpeaking = false;
+    
+    $('voiceCallOverlay').classList.remove('show');
+    if(callRecognition) callRecognition.abort();
+    if(window.speechSynthesis) window.speechSynthesis.cancel();
+};
+
+$('callMuteBtn').onclick = () => {
+    state.isCallMuted = !state.isCallMuted;
+    $('callMuteBtn').style.background = state.isCallMuted ? 'var(--danger)' : 'rgba(255,255,255,0.1)';
+    $('callMuteBtn').textContent = state.isCallMuted ? '🔇' : '🎤';
+    
+    if(state.isCallMuted) { 
+        if(callRecognition) callRecognition.abort(); 
+        if(window.speechSynthesis) window.speechSynthesis.cancel();
+        state.isAISpeaking = false;
+        $('callStatus').textContent = "Mikrofon Dimatikan"; 
+        $('callAvatar').classList.remove('speaking'); 
+    } else { 
+        if(state.isVoiceCallActive && !state.isAIThinking && !state.isAISpeaking) {
+            if(callRecognition) try { callRecognition.start(); } catch(e){}
+            $('callStatus').textContent = "Mendengarkan..."; 
+            $('callAvatar').classList.remove('speaking');
+        }
+    }
+};
+
+async function sendCallMessage(text) {
+    if(state.busy) return;
+    state.busy = true;
+    state.isAIThinking = true;
+    
+    if(callRecognition) callRecognition.abort();
+    
+    $('callStatus').textContent = "Xenon sedang berpikir...";
+    $('callAvatar').classList.remove('speaking');
+
+    try {
+        const sysPrompt = "Kamu adalah Xenon AI di mode telepon. Jawablah SANGAT SINGKAT, maksimal 2 kalimat.";
+        
+        // MEMANGGIL API VERCEL (BUKAN GROQ LANGSUNG)
+        const res = await fetch('/api/chat', {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: AI_MODEL, stream: false, messages: [{ role: 'system', content: sysPrompt }, { role: 'user', content: text }] })
+        });
+        
+        if(!res.ok) {
+            let errTxt = await res.text();
+            let jsonErr = JSON.parse(errTxt);
+            throw new Error(jsonErr.error.message || "API Error");
+        }
+        
+        const data = await res.json();
+        const aiText = data.choices[0].message.content;
+        
+        state.isAIThinking = false;
+        state.isAISpeaking = true;
+        
+        $('callStatus').textContent = "Xenon berbicara...";
+        $('callTranscript').textContent = aiText;
+        $('callAvatar').classList.add('speaking');
+        
+        if(window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+            const utt = new SpeechSynthesisUtterance(aiText);
+            utt.lang = 'id-ID';
+            
+            utt.onend = () => {
+                state.isAISpeaking = false;
+                if(state.isVoiceCallActive && !state.isCallMuted) {
+                    $('callStatus').textContent = "Mendengarkan...";
+                    $('callAvatar').classList.remove('speaking');
+                    
+                    setTimeout(() => {
+                        if(state.isVoiceCallActive && !state.isCallMuted && !state.isAIThinking && !state.isAISpeaking) {
+                            if(callRecognition) try { callRecognition.start(); } catch(e){}
+                        }
+                    }, 1000);
+                }
+            };
+            window.speechSynthesis.speak(utt);
+        }
+    } catch(e) { 
+        state.isAIThinking = false;
+        $('callStatus').textContent = "Error Koneksi"; 
+        $('callTranscript').textContent = e.message;
+        
+        if(state.isVoiceCallActive && !state.isCallMuted) {
+            setTimeout(() => { if(callRecognition) try { callRecognition.start(); } catch(e){} }, 1500);
+        }
+    } finally { 
+        state.busy = false; 
+    }
+}
+
+function openPreview(encodedCode) {
+    $('previewIframe').srcdoc = decodeURIComponent(encodedCode);
+    $('previewModal').classList.add('show');
+}
+
+let availableVoices = [];
+function loadVoices() {
+    if (!window.speechSynthesis) return;
+    availableVoices = window.speechSynthesis.getVoices();
+    const select = $('voiceSelect'); if(!select) return;
+    select.innerHTML = '';
+    let idVoices = availableVoices.filter(v => v.lang.includes('id') || v.lang.includes('ID'));
+    if(idVoices.length === 0) idVoices = availableVoices;
+    idVoices.forEach(v => {
+        const opt = document.createElement('option'); opt.value = v.voiceURI; opt.textContent = `${v.name} (${v.lang})`;
+        if(v.voiceURI === state.voiceSettings.voiceURI) opt.selected = true;
+        select.appendChild(opt);
+    });
+}
+if ('speechSynthesis' in window) window.speechSynthesis.onvoiceschanged = loadVoices;
+
+$('voiceSettingsBtn').onclick = () => { loadVoices(); $('voiceModal').classList.add('show'); closeSidebar(); };
+
+$('btnFemale').onclick = () => {
+    const femaleVoice = availableVoices.find(v => 
+        v.name.toLowerCase().includes('female') || 
+        v.name.toLowerCase().includes('wanita') || 
+        v.name.toLowerCase().includes('perempuan')
+    );
+
+    if (femaleVoice) {
+        $('voiceSelect').value = femaleVoice.voiceURI;
+        $('voicePitch').value = 1.2;
+        showToast(`👩 Suara wanita ditemukan: ${femaleVoice.name}`, "success");
+    } else {
+        const googleId = availableVoices.find(v => v.name.includes('Google') && v.lang.includes('id'));
+        if (googleId) {
+            $('voiceSelect').value = googleId.voiceURI;
+            $('voicePitch').value = 1.2;
+            showToast(`👩 Menggunakan suara Google ID: ${googleId.name}`, "success");
+        } else {
+            showToast("Suara wanita tidak ditemukan di HP ini. Silakan pilih manual.", "error");
+        }
+    }
+};
+
+$('voiceClose').onclick = () => {
+    state.voiceSettings.voiceURI = $('voiceSelect').value;
+    state.voiceSettings.rate = parseFloat($('voiceRate').value);
+    state.voiceSettings.pitch = parseFloat($('voicePitch').value);
+    try { localStorage.setItem('xenon_voice_settings', JSON.stringify(state.voiceSettings)); } catch(e) {}
+    $('voiceModal').classList.remove('show'); showToast("✅ Pengaturan disimpan");
+};
+
+function readText(text) {
+  if(state.ttsMuted || !('speechSynthesis' in window)) return; 
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text.replace(/[#*`>]/g, '').replace(/\[.*?\]\(.*?\)/g, ''));
+  utt.lang = 'id-ID'; utt.rate = state.voiceSettings.rate; utt.pitch = state.voiceSettings.pitch;
+  const sel = availableVoices.find(v => v.voiceURI === state.voiceSettings.voiceURI);
+  if(sel) utt.voice = sel;
+  window.speechSynthesis.speak(utt);
+}
+
+$('ttsToggleBtn').onclick = () => {
+  state.ttsMuted = !state.ttsMuted;
+  $('ttsToggleBtn').textContent = state.ttsMuted ? '🔇' : '🔊';
+  $('ttsToggleBtn').classList.toggle('muted', state.ttsMuted);
+  if(state.ttsMuted) window.speechSynthesis.cancel();
+};
+
+if(SpeechRecognition) {
+  state.recognition = new SpeechRecognition();
+  state.recognition.lang = 'id-ID';
+  $('micBtn').onclick = () => {
+    if($('micBtn').classList.contains('voice-active')) state.recognition.stop();
+    else { state.recognition.start(); $('micBtn').classList.add('voice-active'); }
+  };
+  state.recognition.onresult = (e) => { inputEl.value += e.results[0][0].transcript; };
+  state.recognition.onend = () => {
+    $('micBtn').classList.remove('voice-active');
+    if (inputEl.value.trim().length > 0 && !state.busy) sendMessage();
+  };
+}
+
+function resizeImage(file, maxWidth = 600, maxHeight = 600) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                let width = img.width, height = img.height;
+                if (width > height) { if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; } }
+                else { if (height > maxHeight) { width *= maxHeight / height; height = maxHeight; } }
+                const canvas = document.createElement('canvas');
+                canvas.width = width; canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+$('attachBtn').onclick = () => $('fileInput').click();
+$('fileInput').onchange = async (e) => {
+    const file = e.target.files[0]; if(!file) return;
+    
+    if (file.type.startsWith('image/')) {
+        showToast("Memproses gambar...", "info");
+        const resized = await resizeImage(file);
+        state.pendingAttachment = { name: file.name, type: 'image', data: resized };
+        $('attachmentPreview').style.display = 'flex'; $('fileName').textContent = file.name;
+        $('fileIcon').innerHTML = `<img src="${resized}">`;
+    } else {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            state.pendingAttachment = { name: file.name, type: 'text', data: ev.target.result };
+            $('attachmentPreview').style.display = 'flex'; $('fileName').textContent = file.name;
+            $('fileIcon').textContent = '📄';
+        };
+        reader.readAsText(file);
+    }
+};
+function clearAttachment() { state.pendingAttachment = null; $('fileInput').value = ''; $('attachmentPreview').style.display = 'none'; }
+
+function newChat() { const chat = { id: 'c'+Date.now(), title: 'Obrolan Baru', messages: [] }; state.chats.unshift(chat); state.currentId = chat.id; save(); renderAll(); }
+function closeSidebar() { sidebar.classList.remove('open'); backdrop.style.display = 'none'; }
+$('searchChat').addEventListener('input', (e) => renderSidebar(e.target.value));
+
+function deleteChat(id) { state.chats = state.chats.filter(x => x.id !== id); if(state.currentId === id) state.currentId = state.chats[0]?.id || null; save(); if(!state.chats.length) newChat(); else renderAll(); }
+function renderSidebar(search = '') {
+  chatListEl.innerHTML = '';
+  state.chats.filter(c => c.title.toLowerCase().includes(search.toLowerCase())).forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'chat-item' + (c.id === state.currentId ? ' active' : '');
+    el.innerHTML = `<span style="opacity:.55">💬</span><span class="title">${c.title}</span>`;
+    el.onclick = () => { state.currentId = c.id; renderAll(); closeSidebar(); };
+    let timer;
+    const start = (e) => { if(e.cancelable) e.preventDefault(); timer = setTimeout(() => { state.actionChatId = c.id; $('chatActionTitle').textContent = c.title; $('chatActionModal').classList.add('show'); }, 500); };
+    const cancel = () => clearTimeout(timer);
+    el.addEventListener('touchstart', start, {passive: false}); el.addEventListener('touchend', cancel); el.addEventListener('touchmove', cancel);
+    el.addEventListener('mousedown', start); el.addEventListener('mouseup', cancel); el.addEventListener('mouseleave', cancel);
+    chatListEl.appendChild(el);
+  });
+}
+
+$('actionDeleteChat').onclick = () => { deleteChat(state.actionChatId); $('chatActionModal').classList.remove('show'); };
+$('actionEditTitle').onclick = () => { const chat = state.chats.find(c => c.id === state.actionChatId); const nt = prompt('Nama baru:', chat.title); if(nt && nt.trim()) { chat.title = nt.trim(); save(); renderAll(); } $('chatActionModal').classList.remove('show'); };
+$('actionCancel').onclick = () => $('chatActionModal').classList.remove('show');
+
+if(typeof marked !== 'undefined') marked.setOptions({ breaks: true, gfm: true });
+
+function parseMarkdown(text) {
+    if (!text) return "";
+    try {
+        if (typeof marked !== 'undefined') {
+            let html = marked.parse(text);
+            return html.replace(/<pre><code[^>]*class="language-(\w+)"[^>]*>([\s\S]*?)<\/code><\/pre>/g, (match, lang, code) => {
+                let safeCode = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                let actionButtons = `<button class="copyBtn" onclick="navigator.clipboard.writeText(this.closest('.codeblock').querySelector('code').innerText)">Salin</button>`;
+                if (['html', 'css', 'javascript', 'js'].includes(lang.toLowerCase())) {
+                    actionButtons = `<button class="previewBtn" data-code="${encodeURIComponent(code)}">👁️ Preview</button>` + actionButtons;
+                }
+                return `<div class="codeblock"><div class="codehead"><span>${lang}</span><div class="code-actions">${actionButtons}</div></div><pre><code class="language-${lang}">${safeCode}</code></pre></div>`;
+            });
+        }
+    } catch(e) { console.log("Markdown error:", e); }
+    return text.replace(/\n/g, '<br>');
+}
+
+function renderMessages() {
+  messagesEl.innerHTML = '';
+  const chat = getCurrent();
+  if(!chat || !chat.messages.length) {
+    messagesEl.innerHTML = `<div style="text-align:center;margin-top:20vh;color:var(--muted);"><h2 style="color:var(--accent2);font-size:28px;">Xenon AI</h2><p>Tanyakan apa saja atau kirimkan gambar.</p></div>`;
+    return;
+  }
+
+  const wrap = document.createElement('div'); wrap.className = 'wrap';
+  chat.messages.forEach((m, idx) => {
+    let timeHtml = m.timestamp ? `<span class="msg-time">${formatTime(m.timestamp)}</span>` : '';
+    if(m.role === 'user') {
+        let userContentHtml = m.image ? `<img src="${m.image}" onclick="window.open(this.src)">` : '';
+        if(m.text) userContentHtml += `<div style="margin-top:${m.image ? '8px' : '0'}">${m.text}</div>`;
+        wrap.innerHTML += `<div class="msg user" data-idx="${idx}"><div class="avatar">YOU</div><div class="bubble"><div class="msg-content">${userContentHtml}</div><div class="bubble-footer">${timeHtml}</div></div></div>`;
+    } else if(m.role === 'assistant') {
+      wrap.innerHTML += `<div class="msg ai"><div class="avatar">X</div><div class="msg-ai-wrapper"><div class="bubble"><div class="msg-content">${parseMarkdown(m.content)}</div><div class="bubble-footer"><button class="action-btn tts-trigger" data-idx="${idx}">🔊</button>${timeHtml}</div></div><button class="regen-btn-outside" onclick="regenerateResponse(${idx})"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" fill="none"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg></button></div></div>`;
+    }
+  });
+  messagesEl.appendChild(wrap);
+  
+  wrap.querySelectorAll('.tts-trigger').forEach(btn => {
+    btn.onclick = (e) => {
+        const idx = parseInt(e.target.dataset.idx);
+        readText(getCurrent().messages[idx].content);
+    };
+  });
+
+  wrap.querySelectorAll('.previewBtn').forEach(btn => {
+    btn.onclick = (e) => {
+        openPreview(e.target.dataset.code);
+    };
+  });
+
+  wrap.querySelectorAll('.msg.user').forEach(el => {
+    const idx = parseInt(el.dataset.idx);
+    let timer;
+    const start = (e) => { if(e.cancelable) e.preventDefault(); timer = setTimeout(() => { state.editingMsgIndex = idx; $('editMsgInput').value = getCurrent().messages[idx].text; $('editMsgModal').classList.add('show'); }, 500); };
+    const cancel = () => clearTimeout(timer);
+    const b = el.querySelector('.bubble');
+    b.addEventListener('touchstart', start, {passive: false}); b.addEventListener('touchend', cancel); b.addEventListener('touchmove', cancel);
+    b.addEventListener('mousedown', start); b.addEventListener('mouseup', cancel); b.addEventListener('mouseleave', cancel);
+  });
+
+  if(typeof Prism !== 'undefined') Prism.highlightAll();
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+function renderAll() { renderSidebar($('searchChat').value); renderMessages(); }
+
+function regenerateResponse(idx) { if(state.busy) return; getCurrent().messages = getCurrent().messages.slice(0, idx); save(); renderAll(); triggerAI(); }
+$('editMsgCancel').onclick = () => $('editMsgModal').classList.remove('show');
+$('editMsgSave').onclick = () => {
+  const text = $('editMsgInput').value.trim(); if(!text) return;
+  const chat = getCurrent(); chat.messages = chat.messages.slice(0, state.editingMsgIndex); 
+  chat.messages.push({ role: 'user', text: text, timestamp: Date.now() });
+  save(); renderAll(); $('editMsgModal').classList.remove('show'); triggerAI();
+};
+
+function toggleSendButton(isGenerating) {
+  if(isGenerating) { sendBtn.innerHTML = '⏹'; sendBtn.classList.add('stop-mode'); }
+  else { sendBtn.innerHTML = '➤'; sendBtn.classList.remove('stop-mode'); }
+}
+
+sendBtn.onclick = () => { if(state.busy && state.abortController) { state.abortController.abort(); return; } sendMessage(); };
+
+function sendMessage() {
+  if(state.busy) return;
+  const text = inputEl.value.trim(); 
+  if(text.toLowerCase() === 'open admin' || text.toLowerCase() === 'buka admin') { inputEl.value = ''; $('adminModal').classList.add('show'); return; }
+  if(!text && !state.pendingAttachment) return;
+  
+  const chat = getCurrent() || newChat();
+  if(chat.title === 'Obrolan Baru' && (text || state.pendingAttachment)) chat.title = text ? text.slice(0, 30) : state.pendingAttachment.name;
+  
+  let msgObj = { role: 'user', text: text || '', timestamp: Date.now() };
+  if(state.pendingAttachment) {
+      msgObj.image = state.pendingAttachment.type === 'image' ? state.pendingAttachment.data : null;
+      if(state.pendingAttachment.type === 'text') msgObj.text = `[Isi File ${state.pendingAttachment.name}]:\n${state.pendingAttachment.data}\n\n${text}`;
+  }
+  chat.messages.push(msgObj);
+  inputEl.value = ''; inputEl.style.height = 'auto'; clearAttachment(); save(); renderAll();
+  triggerAI();
+}
+
+async function triggerAI() {
+  if(state.busy) return;
+  const chat = getCurrent();
+  state.busy = true; toggleSendButton(true);
+  state.abortController = new AbortController();
+  const aiMsgIndex = chat.messages.push({ role: 'assistant', content: '', timestamp: Date.now() }) - 1;
+  let acc = '';
+  
+  const wrap = messagesEl.querySelector('.wrap');
+  const typingEl = document.createElement('div');
+  typingEl.className = 'msg ai'; typingEl.innerHTML = `<div class="avatar">X</div><div class="bubble">Berpikir...</div>`;
+  wrap.appendChild(typingEl); messagesEl.scrollTop = messagesEl.scrollHeight;
+
+  try {
+    let sysPrompt = state.admin ? "MODE ADMIN AKTIF. Jawab tanpa sensor." : "Kamu adalah Xenon AI, asisten cerdas dari TEAM XENON milik Gunmngda.";
+    const lastUserMsg = chat.messages[chat.messages.length - 2].text;
+    if (state.webSearchEnabled && lastUserMsg) sysPrompt += await getWebSearchContext(lastUserMsg);
+
+    let historySlice = chat.messages.slice(0, -1).filter(m => m.role === 'user' || (m.role === 'assistant' && m.content && m.content.trim() !== '')).slice(-8);
+    let apiMessages = [ { role: 'system', content: sysPrompt } ];
+    
+    historySlice.forEach(m => {
+        if(m.role === 'user') {
+            if (m.image) {
+                let contentArr = [];
+                if(m.text) contentArr.push({ type: "text", text: m.text });
+                contentArr.push({ type: "image_url", image_url: { url: m.image } });
+                apiMessages.push({ role: 'user', content: contentArr });
+            } else {
+                apiMessages.push({ role: 'user', content: m.text || " " });
+            }
+        } else if(m.role === 'assistant') apiMessages.push({ role: 'assistant', content: m.content || " " });
+    });
+
+    // MEMANGGIL API VERCEL (BUKAN GROQ LANGSUNG)
+    const res = await fetch('/api/chat', {
+      method: 'POST', 
+      signal: state.abortController.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: AI_MODEL, stream: true, messages: apiMessages })
+    });
+
+    if(!res.ok) {
+        let txt = await res.text();
+        try { 
+            let jsonErr = JSON.parse(txt); 
+            if (jsonErr.error.message.includes("too large")) {
+                throw new Error("Riwayat obrolan terlalu panjang. Silakan mulai obrolan baru.");
+            }
+            throw new Error(jsonErr.error.message || 'API Error'); 
+        } catch(e) { throw new Error(txt.slice(0, 100)); }
+    }
+
+    const reader = res.body.getReader(); const dec = new TextDecoder();
+    typingEl.remove();
+    
+    const bubbleEl = document.createElement('div'); bubbleEl.className = 'msg ai';
+    bubbleEl.innerHTML = `<div class="avatar">X</div><div class="msg-ai-wrapper"><div class="bubble"><div class="msg-content"></div><div class="bubble-footer"><button class="action-btn">🔊</button><span class="msg-time">${formatTime(chat.messages[aiMsgIndex].timestamp)}</span></div></div></div>`;
+    wrap.appendChild(bubbleEl); 
+    
+    const bubbleContent = bubbleEl.querySelector('.msg-content');
+
+    let renderInterval = setInterval(() => {
+        bubbleContent.innerHTML = parseMarkdown(acc);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }, 50);
+
+    while(true) {
+      const { done, value } = await reader.read(); if(done) break;
+      const chunk = dec.decode(value);
+      const lines = chunk.split('\n').filter(l => l.startsWith('data: ') && l !== 'data: [DONE]');
+      for(let line of lines) {
+        try { const data = JSON.parse(line.slice(6)); const delta = data.choices[0]?.delta?.content; if (delta) acc += delta; } catch(e) {}
+      }
+    }
+    
+    clearInterval(renderInterval);
+
+    if(!acc || acc.trim() === '') throw new Error("Respon kosong.");
+    chat.messages[aiMsgIndex].content = acc; save(); 
+    if(!state.ttsMuted && acc) readText(acc);
+
+  } catch(e) {
+    typingEl.remove();
+    if(e.name === 'AbortError') { if(acc) chat.messages[aiMsgIndex].content = acc; else chat.messages.pop(); save(); renderAll(); }
+    else { showToast("❌ " + e.message, "error"); if(!acc) chat.messages.pop(); save(); renderAll(); }
+  } finally {
+    state.busy = false; toggleSendButton(false);
+    if (chat.messages[aiMsgIndex] && chat.messages[aiMsgIndex].content) renderAll();
+  }
+}
+
+$('menuBtn').onclick = () => { sidebar.classList.add('open'); backdrop.style.display = 'block'; };
+backdrop.onclick = closeSidebar;
+$('newChat').onclick = () => { newChat(); closeSidebar(); };
+inputEl.addEventListener('input', () => { inputEl.style.height = 'auto'; inputEl.style.height = inputEl.scrollHeight + 'px'; });
+inputEl.addEventListener('keydown', (e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+
+$('codeSubmit').onclick = () => {
+  if($('codeInput').value === ADMIN_CODE) { state.admin = true; $('adminModal').classList.remove('show'); $('adminBadge').classList.add('on'); showToast("✅ Admin Mode Aktif", "success"); }
+  else showToast("❌ PIN Salah", "error");
+};
+
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+if(state.chats.length) state.currentId = state.chats[0].id; else newChat();
+loadVoices(); renderAll();
+</script>
+</body>
+  </html>
